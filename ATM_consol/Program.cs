@@ -5,111 +5,124 @@ namespace ATM_consol
 {
     public class Program
     {
-        const string id = "ia9234";
+        const string ATM_ID = "ia9234";
         const int MAX_LOGIN_ATTEMPTS = 3;
-        
-        public static void printText(string t)
+
+        public static void PrintText(string text)
         {
-            Console.WriteLine(t);
+            Console.WriteLine(text);
         }
+
+        public static string GetInput(string prompt)
+        {
+            Console.Write(prompt);
+            return Console.ReadLine();
+        }
+
+        // A generic method for handling retries during input
+        public static string GetValidInputWithRetries(string prompt, Func<string, bool> validateInput)
+        {
+            int attemptCount = 0;
+            string input;
+            do
+            {
+                input = GetInput(prompt);
+                if (!validateInput(input))
+                {
+                    Console.WriteLine("Error!");
+                    if (++attemptCount == MAX_LOGIN_ATTEMPTS)
+                    {
+                        Console.WriteLine("Max attempts reached.");
+                        return null;
+                    }
+                }
+                else
+                {
+                    break;
+                }
+            } while (true);
+
+            return input;
+        }
+
         static void Main(string[] args)
         {
-            Money money = new Money();            
+            Money money = new Money();
             AutomatedTellerMachine atm = new AutomatedTellerMachine();
             Console.OutputEncoding = System.Text.Encoding.Unicode;
             Console.InputEncoding = System.Text.Encoding.Unicode;
-            int t = atm.FindATM(id);
-            if (t == -1)
+
+            int atmIndex = atm.FindATM(ATM_ID);
+            if (atmIndex == -1)
             {
-                Console.WriteLine("Помилка!");
-                Console.WriteLine("На жаль цей банкомат більше не обслуговується нашим банком.");
+                Console.WriteLine("Error: ATM not found.");
                 return;
             }
-            Console.WriteLine($"{atm.FindName(t)}, {atm.FindStreet(t)}\n");
-            money.RegisterHandler(new Money.AccountStateHandler(printText));
-            
-            Console.Write("Введіть номер карти: ");
-            string card = Console.ReadLine();
-            int atempt = 1;
-            int i;
-            
-            while ((i = money.LogInCard(card)) == -1)
+
+            Console.WriteLine($"{atm.FindName(atmIndex)}, {atm.FindStreet(atmIndex)}\n");
+
+            money.RegisterHandler(new Money.AccountStateHandler(PrintText));
+
+            // Using the generic method to get valid card input
+            string card = GetValidInputWithRetries("Enter card number: ", cardInput =>
             {
-                Console.WriteLine("Помилка!");
-                if (atempt == MAX_LOGIN_ATTEMPTS)
-                {
-                    Console.WriteLine("Кількість спроб закінчились.");
-                    return;
-                }
-                Console.Write("Введіть номер карти: ");
-                card = Console.ReadLine();
-                atempt++;
-            }
+                return money.LogInCard(cardInput) != -1;
+            });
+            if (card == null) return; // Max attempts reached
 
-            Console.Write("Введіть пінкод: ");
-            string pin = Console.ReadLine();
-            atempt = 1;
+            int cardIndex = money.LogInCard(card);
 
-            while (!money.LogInPin(i, pin))
+            // Using the generic method to get valid PIN input
+            string pin = GetValidInputWithRetries("Enter PIN: ", pinInput =>
             {
-                Console.WriteLine("Помилка!");
-                if (atempt == MAX_LOGIN_ATTEMPTS)
-                {
-                    Console.WriteLine("Кількість спроб закінчились.");
-                    return;
-                }
-                Console.Write("Введіть пінкод: ");
-                pin = Console.ReadLine();
-                atempt++;
-            }
+                return money.LogInPin(cardIndex, pinInput);
+            });
+            if (pin == null) return; // Max attempts reached
 
-            bool temp = false;
+            bool continueTransaction = true;
             do
             {
-                Console.Write("Оберіть дію: 1 - Перегляд балансу; 2 - Зняття грошей; 3 - Зарахування коштів на карту; 4 - Перерахування коштів іншій людині;\n\t-> ");
-                int choose = int.Parse(Console.ReadLine());
-                switch (choose)
+                Console.Write("Choose an action: 1 - View balance; 2 - Withdraw money; 3 - Deposit money; 4 - Transfer money.\n-> ");
+                int action = int.Parse(Console.ReadLine());
+                switch (action)
                 {
                     case 1:
-                        money.ShowMoney(i);
+                        money.ShowMoney(cardIndex);
                         break;
                     case 2:
-                        Console.WriteLine("\nВведіть суму: ");
-                        int cash = int.Parse(Console.ReadLine());
-                        money.TakeMoney(i, cash, t);
+                        int amount = int.Parse(Console.ReadLine());
+                        money.TakeMoney(cardIndex, amount, atmIndex);
                         break;
                     case 3:
-                        Console.Write("\nВведіть суму: ");
-                        cash = int.Parse(Console.ReadLine());
-                        money.GiveMoney(i, cash, t);
+                        amount = int.Parse(Console.ReadLine());
+                        money.GiveMoney(cardIndex, amount, atmIndex);
                         break;
                     case 4:
-                        Console.Write("\nВведіть номер карти для перерахування: ");
-                        string cardSend = Console.ReadLine();
-                        int j;
-                        while ((j = money.LogInCard(cardSend)) == -1 || cardSend == money.getCard(i))
+                        string transferCard = GetValidInputWithRetries("Enter card number for transfer: ", transferCardInput =>
                         {
-                            Console.WriteLine("Помилка!");
-                            Console.Write("Введіть номер карти для перерахування: ");
-                            cardSend = Console.ReadLine();
-                        }
-                        Console.Write($"Суму буде перерахованно для {money.getName(j)}.\n\t1 - Продовжити;  2(або інша будь-яка цифра) - Ні\n\t->");
-                        int ans = int.Parse(Console.ReadLine());
-                        if (ans != 1) break;
-                        Console.Write("\nВведіть суму: ");
-                        cash = int.Parse(Console.ReadLine());
-                        money.SendMoney(i, cash, j);
+                            return transferCardInput != money.getCard(cardIndex) && money.LogInCard(transferCardInput) != -1;
+                        });
+                        if (transferCard == null) break; // Max attempts reached
+
+                        int transferIndex = money.LogInCard(transferCard);
+                        Console.Write($"Transfer money to {money.getName(transferIndex)}.\n\t1 - Continue;  2 - Cancel\n\t-> ");
+                        int confirmation = int.Parse(Console.ReadLine());
+                        if (confirmation != 1) break;
+
+                        amount = int.Parse(Console.ReadLine());
+                        money.SendMoney(cardIndex, amount, transferIndex);
                         break;
                     default:
-                        Console.WriteLine("Такої дії не існує.");
+                        Console.WriteLine("Invalid action.");
                         break;
                 }
-                Console.Write("Чи бажаєте ви продовжити?\n\t1 - Так; 2(або інша будь-яка цифра) - Ні\n\t->");
-                int answer = int.Parse(Console.ReadLine());
-                temp = answer == 1;
-            } while (temp);
-            
-            Console.WriteLine("До побачення!");
+
+                Console.Write("Do you want to continue?\n\t1 - Yes; 2 - No\n\t-> ");
+                continueTransaction = Console.ReadLine() == "1";
+
+            } while (continueTransaction);
+
+            Console.WriteLine("Goodbye!");
         }
     }
 }
