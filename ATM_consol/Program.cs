@@ -6,6 +6,8 @@ namespace ATM_consol
     public class Program
     {
         const string id = "ia9234";
+        const int MAX_LOGIN_ATTEMPTS = 3;
+        
         public static void printText(string t)
         {
             Console.WriteLine(t);
@@ -29,12 +31,12 @@ namespace ATM_consol
             Console.Write("Введіть номер карти: ");
             string card = Console.ReadLine();
             int atempt = 1;
-            int i; // Declare variable to store login index
+            int i;
             
-            while ((i = money.LogInCard(card)) == -1) // Store result in variable
+            while ((i = money.LogInCard(card)) == -1)
             {
                 Console.WriteLine("Помилка!");
-                if (atempt == 3)
+                if (atempt == MAX_LOGIN_ATTEMPTS)
                 {
                     Console.WriteLine("Кількість спроб закінчились.");
                     return;
@@ -51,7 +53,7 @@ namespace ATM_consol
             while (!money.LogInPin(i, pin))
             {
                 Console.WriteLine("Помилка!");
-                if (atempt == 3)
+                if (atempt == MAX_LOGIN_ATTEMPTS)
                 {
                     Console.WriteLine("Кількість спроб закінчились.");
                     return;
@@ -84,7 +86,7 @@ namespace ATM_consol
                     case 4:
                         Console.Write("\nВведіть номер карти для перерахування: ");
                         string cardSend = Console.ReadLine();
-                        int j; // Declare variable to store login index for recipient
+                        int j;
                         while ((j = money.LogInCard(cardSend)) == -1 || cardSend == money.getCard(i))
                         {
                             Console.WriteLine("Помилка!");
